@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+    echo "Usage: CS <path_to_example>"
+    exit 1
+fi
+
+SCRIPT_DIR="$(pwd)"
+
+python3 "$SCRIPT_DIR/run.py" "$SCRIPT_DIR/$1"
