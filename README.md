@@ -9,5 +9,5 @@
 ## 🚀 Lệnh chạy
 
 ```bash
-./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast.py
-./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast.py::test_001
+./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast_gen.py
+./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast_gen.py::test_001
