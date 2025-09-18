@@ -70,11 +70,16 @@ class ASTGenerator:
         self.lexer = OPLangLexer(self.input_stream)
         self.token_stream = CommonTokenStream(self.lexer)
         self.parser = OPLangParser(self.token_stream)
+        self.parser.removeErrorListeners()
+        self.parser.addErrorListener(NewErrorListener.INSTANCE)
         self.ast_generator = ASTGeneration()
 
     def generate(self):
         """Generate AST from the input string."""
-        parse_tree = self.parser.program()
+        try:
+            parse_tree = self.parser.program() 
+        except Exception as e:
+            return "Parser " + str(e)
         
         # Generate AST using the visitor
         ast = self.ast_generator.visit(parse_tree)

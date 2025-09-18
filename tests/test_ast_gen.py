@@ -90,7 +90,7 @@ def test_008():
             arr[0] := 42;
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([VariableDecl(False, ArrayType(PrimitiveType("int"), 5), [Variable("arr", None)])] , [AssignmentStatement(PostfixLHS(PostfixExpression(Identifier("arr"), ArrayAccess(IntLiteral(0)))), IntLiteral(42))]))])])
+    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([VariableDecl(False, ArrayType(PrimitiveType("int"), IntLiteral(5)), [Variable("arr", None)])] , [AssignmentStatement(PostfixLHS(PostfixExpression(Identifier("arr"), ArrayAccess(IntLiteral(0)))), IntLiteral(42))]))])])
     assert str(ASTGenerator(source).generate()) == str(expected)
 
 
