@@ -66,10 +66,10 @@ class ClassDecl(ASTNode):
         return visitor.visit_class_decl(self, o)
 
     def __str__(self):
-        super_str = f"\"{self.superclass}\"" if self.superclass else "None"
+        super_str = f", extends {self.superclass}" if self.superclass else ""
         members_str = ", ".join(str(m) for m in self.members) if self.members else ""
         members_part = f"[{members_str}]" if members_str else "[]"
-        return f"ClassDecl(\"{self.name}\", {super_str}, {members_part})"
+        return f"ClassDecl({self.name}{super_str}, {members_part})"
 
 
 class ClassMember(ASTNode):
@@ -103,8 +103,10 @@ class AttributeDecl(ClassMember):
         return visitor.visit_attribute_decl(self, o)
 
     def __str__(self):
+        static_str = "static " if self.is_static else ""
+        final_str = "final " if self.is_final else ""
         attrs_str = ", ".join(str(a) for a in self.attributes)
-        return f"AttributeDecl({str(self.is_static)}, {str(self.is_final)}, {self.attr_type}, [{attrs_str}])"
+        return f"AttributeDecl({static_str}{final_str}{self.attr_type}, [{attrs_str}])"
 
 
 class Attribute(ASTNode):
@@ -119,8 +121,8 @@ class Attribute(ASTNode):
         return visitor.visit_attribute(self, o)
 
     def __str__(self):
-        init_str = f"{self.init_value}" if self.init_value else "None"
-        return f"Attribute(\"{self.name}\", {init_str})"
+        init_str = f" = {self.init_value}" if self.init_value else ""
+        return f"Attribute({self.name}{init_str})"
 
 
 # ============================================================================
@@ -150,10 +152,10 @@ class MethodDecl(ClassMember):
         return visitor.visit_method_decl(self, o)
 
     def __str__(self):
-        static_str = "True" if self.is_static else "False"
+        static_str = "static " if self.is_static else ""
         params_str = ", ".join(str(p) for p in self.params) if self.params else ""
         params_part = f"[{params_str}]" if params_str else "[]"
-        return f"MethodDecl({static_str}, {self.return_type}, \"{self.name}\", {params_part}, {self.body})"
+        return f"MethodDecl({static_str}{self.return_type} {self.name}({params_part}), {self.body})"
 
 
 class ConstructorDecl(ClassMember):
@@ -171,7 +173,7 @@ class ConstructorDecl(ClassMember):
     def __str__(self):
         params_str = ", ".join(str(p) for p in self.params) if self.params else ""
         params_part = f"[{params_str}]" if params_str else "[]"
-        return f"ConstructorDecl(\"{self.name}\", {params_part}, {self.body})"
+        return f"ConstructorDecl({self.name}({params_part}), {self.body})"
 
 
 class DestructorDecl(ClassMember):
@@ -186,7 +188,7 @@ class DestructorDecl(ClassMember):
         return visitor.visit_destructor_decl(self, o)
 
     def __str__(self):
-        return f"DestructorDecl(\"{self.name}\", {self.body})"
+        return f"DestructorDecl(~{self.name}(), {self.body})"
 
 
 class Parameter(ASTNode):
@@ -201,7 +203,7 @@ class Parameter(ASTNode):
         return visitor.visit_parameter(self, o)
 
     def __str__(self):
-        return f"Parameter({self.param_type}, \"{self.name}\")"
+        return f"Parameter({self.param_type} {self.name})"
 
 
 # ============================================================================
@@ -226,7 +228,7 @@ class PrimitiveType(Type):
         return visitor.visit_primitive_type(self, o)
 
     def __str__(self):
-        return f"PrimitiveType(\"{self.type_name}\")"
+        return f"PrimitiveType({self.type_name})"
 
 
 class ArrayType(Type):
@@ -241,7 +243,7 @@ class ArrayType(Type):
         return visitor.visit_array_type(self, o)
 
     def __str__(self):
-        return f"ArrayType({self.element_type}, {self.size})"
+        return f"ArrayType({self.element_type}[{self.size}])"
 
 
 class ClassType(Type):
@@ -255,7 +257,7 @@ class ClassType(Type):
         return visitor.visit_class_type(self, o)
 
     def __str__(self):
-        return f"ClassType(\"{self.class_name}\")"
+        return f"ClassType({self.class_name})"
 
 
 class ReferenceType(Type):
@@ -269,7 +271,7 @@ class ReferenceType(Type):
         return visitor.visit_reference_type(self, o)
 
     def __str__(self):
-        return f"ReferenceType({self.referenced_type})"
+        return f"ReferenceType({self.referenced_type} &)"
 
 
 # ============================================================================
@@ -296,12 +298,12 @@ class BlockStatement(Statement):
 
     def __str__(self):
         vars_str = ", ".join(str(v) for v in self.var_decls) if self.var_decls else ""
-        vars_part = f"[{vars_str}] " if vars_str else "[]"
+        vars_part = f"vars=[{vars_str}], " if vars_str else ""
         stmts_str = (
             ", ".join(str(s) for s in self.statements) if self.statements else ""
         )
-        stmts_part = f"[{stmts_str}]" if stmts_str else "[]"
-        return f"BlockStatement({vars_part}, {stmts_part})"
+        stmts_part = f"stmts=[{stmts_str}]" if stmts_str else "stmts=[]"
+        return f"BlockStatement({vars_part}{stmts_part})"
 
 
 class VariableDecl(ASTNode):
@@ -317,9 +319,9 @@ class VariableDecl(ASTNode):
         return visitor.visit_variable_decl(self, o)
 
     def __str__(self):
-        final_str = "True" if self.is_final else "False"
+        final_str = "final " if self.is_final else ""
         vars_str = ", ".join(str(v) for v in self.variables)
-        return f"VariableDecl({final_str}, {self.var_type}, [{vars_str}])"
+        return f"VariableDecl({final_str}{self.var_type}, [{vars_str}])"
 
 
 class Variable(ASTNode):
@@ -334,8 +336,8 @@ class Variable(ASTNode):
         return visitor.visit_variable(self, o)
 
     def __str__(self):
-        init_str = f"{self.init_value}" if self.init_value else "None"
-        return f"Variable(\"{self.name}\", {init_str})"
+        init_str = f" = {self.init_value}" if self.init_value else ""
+        return f"Variable({self.name}{init_str})"
 
 
 class AssignmentStatement(Statement):
@@ -350,7 +352,7 @@ class AssignmentStatement(Statement):
         return visitor.visit_assignment_statement(self, o)
 
     def __str__(self):
-        return f"AssignmentStatement({self.lhs}, {self.rhs})"
+        return f"AssignmentStatement({self.lhs} := {self.rhs})"
 
 
 class IfStatement(Statement):
@@ -371,8 +373,8 @@ class IfStatement(Statement):
         return visitor.visit_if_statement(self, o)
 
     def __str__(self):
-        else_str = f"{self.else_stmt}" if self.else_stmt else "None"
-        return f"IfStatement({self.condition}, {self.then_stmt}, {else_str})"
+        else_str = f", else {self.else_stmt}" if self.else_stmt else ""
+        return f"IfStatement(if {self.condition} then {self.then_stmt}{else_str})"
 
 
 class ForStatement(Statement):
@@ -397,7 +399,7 @@ class ForStatement(Statement):
         return visitor.visit_for_statement(self, o)
 
     def __str__(self):
-        return f"ForStatement(\"{self.variable}\", {self.start_expr}, \"{self.direction}\", {self.end_expr}, {self.body})"
+        return f"ForStatement(for {self.variable} := {self.start_expr} {self.direction} {self.end_expr} do {self.body})"
 
 
 class BreakStatement(Statement):
@@ -437,7 +439,7 @@ class ReturnStatement(Statement):
         return visitor.visit_return_statement(self, o)
 
     def __str__(self):
-        return f"ReturnStatement({self.value})"
+        return f"ReturnStatement(return {self.value})"
 
 
 class MethodInvocationStatement(Statement):
@@ -476,7 +478,7 @@ class IdLHS(LHS):
         return visitor.visit_id_lhs(self, o)
 
     def __str__(self):
-        return f"IdLHS(\"{self.name}\")"
+        return f"IdLHS({self.name})"
 
 
 class PostfixLHS(LHS):
@@ -517,7 +519,7 @@ class BinaryOp(Expr):
         return visitor.visit_binary_op(self, o)
 
     def __str__(self):
-        return f"BinaryOp({self.left}, \"{self.operator}\", {self.right})"
+        return f"BinaryOp({self.left}, {self.operator}, {self.right})"
 
 
 class UnaryOp(Expr):
@@ -532,13 +534,13 @@ class UnaryOp(Expr):
         return visitor.visit_unary_op(self, o)
 
     def __str__(self):
-        return f"UnaryOp(\"{self.operator}\", {self.operand})"
+        return f"UnaryOp({self.operator}, {self.operand})"
 
 
 class PostfixExpression(Expr):
     """Postfix expression for method calls, member access, array access."""
 
-    def __init__(self, primary: Expr, postfix_ops: "PostfixOp"):
+    def __init__(self, primary: Expr, postfix_ops: List["PostfixOp"]):
         super().__init__()
         self.primary = primary
         self.postfix_ops = postfix_ops
@@ -547,8 +549,8 @@ class PostfixExpression(Expr):
         return visitor.visit_postfix_expression(self, o)
 
     def __str__(self):
-        # ops_str = "".join(str(op) for op in self.postfix_ops)
-        return f"PostfixExpression({self.primary}, {self.postfix_ops})"
+        ops_str = "".join(str(op) for op in self.postfix_ops)
+        return f"PostfixExpression({self.primary}{ops_str})"
 
 
 class PostfixOp(ASTNode):
@@ -570,7 +572,7 @@ class MethodCall(PostfixOp):
 
     def __str__(self):
         args_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
-        return f"MethodCall(\"{self.method_name}\", [{args_str}])"
+        return f".{self.method_name}({args_str})"
 
 
 class MemberAccess(PostfixOp):
@@ -584,7 +586,7 @@ class MemberAccess(PostfixOp):
         return visitor.visit_member_access(self, o)
 
     def __str__(self):
-        return f"MemberAccess(\"{self.member_name}\")"
+        return f".{self.member_name}"
 
 
 class ArrayAccess(PostfixOp):
@@ -598,7 +600,7 @@ class ArrayAccess(PostfixOp):
         return visitor.visit_array_access(self, o)
 
     def __str__(self):
-        return f"ArrayAccess({self.index})"
+        return f"[{self.index}]"
 
 
 class ObjectCreation(Expr):
@@ -614,41 +616,22 @@ class ObjectCreation(Expr):
 
     def __str__(self):
         args_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
-        return f"ObjectCreation(\"{self.class_name}\", [{args_str}])"
+        return f"ObjectCreation(new {self.class_name}({args_str}))"
 
 
-# class StaticMethodInvocation(Expr):
-#     """Static method invocation expression."""
+class StaticMemberAccess(Expr):
+    """Static member access expression."""
 
-#     def __init__(self, class_name: str, method_name: str, args: List[Expr]):
-#         super().__init__()
-#         self.class_name = class_name
-#         self.method_name = method_name
-#         self.args = args
+    def __init__(self, class_name: str, member_name: str):
+        super().__init__()
+        self.class_name = class_name
+        self.member_name = member_name
 
-#     def accept(self, visitor, o=None):
-#         return visitor.visit_static_method_invocation(self, o)
+    def accept(self, visitor, o=None):
+        return visitor.visit_static_member_access(self, o)
 
-#     def __str__(self):
-#         args_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
-#         return (
-#             f"StaticMethodInvocation({self.class_name}.{self.method_name}({args_str}))"
-#         )
-
-
-# class StaticMemberAccess(Expr):
-#     """Static member access expression."""
-
-#     def __init__(self, class_name: str, member_name: str):
-#         super().__init__()
-#         self.class_name = class_name
-#         self.member_name = member_name
-
-#     def accept(self, visitor, o=None):
-#         return visitor.visit_static_member_access(self, o)
-
-#     def __str__(self):
-#         return f"StaticMemberAccess({self.class_name}.{self.member_name})"
+    def __str__(self):
+        return f"StaticMemberAccess({self.class_name}.{self.member_name})"
 
 
 class MethodInvocation(Expr):
@@ -665,6 +648,25 @@ class MethodInvocation(Expr):
         return f"MethodInvocation({self.postfix_expr})"
 
 
+class StaticMethodInvocation(Expr):
+    """Static method invocation expression."""
+
+    def __init__(self, class_name: str, method_name: str, args: List[Expr]):
+        super().__init__()
+        self.class_name = class_name
+        self.method_name = method_name
+        self.args = args
+
+    def accept(self, visitor, o=None):
+        return visitor.visit_static_method_invocation(self, o)
+
+    def __str__(self):
+        args_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
+        return (
+            f"StaticMethodInvocation({self.class_name}.{self.method_name}({args_str}))"
+        )
+    
+
 class Identifier(Expr):
     """Identifier expression."""
 
@@ -676,7 +678,7 @@ class Identifier(Expr):
         return visitor.visit_identifier(self, o)
 
     def __str__(self):
-        return f"Identifier(\"{self.name}\")"
+        return f"Identifier({self.name})"
 
 
 class ThisExpression(Expr):
@@ -689,7 +691,7 @@ class ThisExpression(Expr):
         return visitor.visit_this_expression(self, o)
 
     def __str__(self):
-        return "ThisExpression()"
+        return "ThisExpression(this)"
 
 
 class ParenthesizedExpression(Expr):
@@ -755,7 +757,7 @@ class BoolLiteral(Literal):
         return visitor.visit_bool_literal(self, o)
 
     def __str__(self):
-        return f"BoolLiteral({self.value })"
+        return f"BoolLiteral({self.value})"
 
 
 class StringLiteral(Literal):
@@ -782,7 +784,7 @@ class ArrayLiteral(Literal):
 
     def __str__(self):
         elements_str = ", ".join(str(elem) for elem in self.value) if self.value else ""
-        return f"ArrayLiteral([{elements_str}])"
+        return f"ArrayLiteral({{{elements_str}}})"
 
 
 class NilLiteral(Literal):
@@ -795,4 +797,4 @@ class NilLiteral(Literal):
         return visitor.visit_nil_literal(self, o)
 
     def __str__(self):
-        return "NilLiteral()"
+        return "NilLiteral(nil)"

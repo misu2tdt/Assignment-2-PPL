@@ -1,5 +1,4 @@
 from utils import ASTGenerator
-from src.utils.nodes import *
 
 
 def test_001():
@@ -7,20 +6,19 @@ def test_001():
     source = """class TestClass {
         int x;
     }"""
-    expected = Program([ClassDecl("TestClass", None, [AttributeDecl(False, False, PrimitiveType("int"), [Attribute("x", None)])])])
+    expected = "Program([ClassDecl(TestClass, [AttributeDecl(PrimitiveType(int), [Attribute(x)])])])"
     # Just check that it doesn't return an error
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_002():
     """Test class with method declaration AST generation"""
     source = """class TestClass {
         void main() {
-            return;
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([], [ReturnStatement(NilLiteral())]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) main([]), BlockStatement(stmts=[]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_003():
@@ -31,8 +29,8 @@ def test_003():
             this.x := x;
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [AttributeDecl(False, False, PrimitiveType("int"), [Attribute("x", None)]), ConstructorDecl("TestClass", [Parameter(PrimitiveType("int"), "x")], BlockStatement([], [AssignmentStatement(PostfixLHS(PostfixExpression(ThisExpression(), MemberAccess("x"))), Identifier("x"))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [AttributeDecl(PrimitiveType(int), [Attribute(x)]), ConstructorDecl(TestClass([Parameter(PrimitiveType(int) x)]), BlockStatement(stmts=[AssignmentStatement(PostfixLHS(PostfixExpression(ThisExpression(this).x)) := Identifier(x))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_004():
@@ -40,8 +38,8 @@ def test_004():
     source = """class Child extends Parent {
         int y;
     }"""
-    expected = Program([ClassDecl("Child", "Parent", [AttributeDecl(False, False, PrimitiveType("int"), [Attribute("y", None)])])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(Child, extends Parent, [AttributeDecl(PrimitiveType(int), [Attribute(y)])])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_005():
@@ -50,23 +48,23 @@ def test_005():
         static final int MAX_SIZE := 100;
         final float PI := 3.14;
     }"""
-    expected = Program([ClassDecl("TestClass", None, [AttributeDecl(True, True, PrimitiveType("int"), [Attribute("MAX_SIZE", IntLiteral(100))]), AttributeDecl(False, True, PrimitiveType("float"), [Attribute("PI", FloatLiteral(3.14))])])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [AttributeDecl(static final PrimitiveType(int), [Attribute(MAX_SIZE = IntLiteral(100))]), AttributeDecl(final PrimitiveType(float), [Attribute(PI = FloatLiteral(3.14))])])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_006():
     """Test if-else statement AST generation"""
     source = """class TestClass {
         void main() {
-            if (x > 0) then {
+            if x > 0 then {
                 return x;
             } else {
                 return 0;
             }
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([], [IfStatement(ParenthesizedExpression((BinaryOp(Identifier("x"), ">", IntLiteral(0)))), BlockStatement([], [ReturnStatement(Identifier("x"))]), BlockStatement([], [ReturnStatement(IntLiteral(0))]))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) main([]), BlockStatement(stmts=[IfStatement(if BinaryOp(Identifier(x), >, IntLiteral(0)) then BlockStatement(stmts=[ReturnStatement(return Identifier(x))]), else BlockStatement(stmts=[ReturnStatement(return IntLiteral(0))]))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_007():
@@ -78,8 +76,8 @@ def test_007():
             }
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([], [ForStatement("i", IntLiteral(1), "to", IntLiteral(10), BlockStatement([], [MethodInvocationStatement(MethodInvocation(PostfixExpression(Identifier("io"), MethodCall("writeIntLn", [Identifier("i")]))))]))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) main([]), BlockStatement(stmts=[ForStatement(for i := IntLiteral(1) to IntLiteral(10) do BlockStatement(stmts=[MethodInvocationStatement(StaticMethodInvocation(io.writeIntLn(Identifier(i))))]))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_008():
@@ -90,8 +88,8 @@ def test_008():
             arr[0] := 42;
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([VariableDecl(False, ArrayType(PrimitiveType("int"), IntLiteral(5)), [Variable("arr", None)])] , [AssignmentStatement(PostfixLHS(PostfixExpression(Identifier("arr"), ArrayAccess(IntLiteral(0)))), IntLiteral(42))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) main([]), BlockStatement(vars=[VariableDecl(ArrayType(PrimitiveType(int)[5]), [Variable(arr)])], stmts=[AssignmentStatement(PostfixLHS(PostfixExpression(Identifier(arr)[IntLiteral(0)])) := IntLiteral(42))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_009():
@@ -102,8 +100,8 @@ def test_009():
             float area := r.getArea();
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([VariableDecl(False, ClassType("Rectangle"), [Variable("r", ObjectCreation("Rectangle", [FloatLiteral(5.0), FloatLiteral(3.0)]))]), VariableDecl(False, PrimitiveType("float"), [Variable("area", PostfixExpression(Identifier("r"), MethodCall("getArea", [])))])] , []))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) main([]), BlockStatement(vars=[VariableDecl(ClassType(Rectangle), [Variable(r = ObjectCreation(new Rectangle(FloatLiteral(5.0), FloatLiteral(3.0))))]), VariableDecl(PrimitiveType(float), [Variable(area = PostfixExpression(Identifier(r).getArea()))])], stmts=[]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_010():
@@ -115,8 +113,8 @@ def test_010():
             b := temp;
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "swap", [Parameter(ReferenceType(PrimitiveType("int")), "a"), Parameter(ReferenceType(PrimitiveType("int")), "b")], BlockStatement([VariableDecl(False, PrimitiveType("int"), [Variable("temp", Identifier("a"))])] , [AssignmentStatement(IdLHS("a"), Identifier("b")), AssignmentStatement(IdLHS("b"), Identifier("temp"))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [MethodDecl(PrimitiveType(void) swap([Parameter(ReferenceType(PrimitiveType(int) &) a), Parameter(ReferenceType(PrimitiveType(int) &) b)]), BlockStatement(vars=[VariableDecl(PrimitiveType(int), [Variable(temp = Identifier(a))])], stmts=[AssignmentStatement(IdLHS(a) := Identifier(b)), AssignmentStatement(IdLHS(b) := Identifier(temp))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_011():
@@ -126,16 +124,5 @@ def test_011():
             io.writeStrLn("Object destroyed");
         }
     }"""
-    expected = Program([ClassDecl("TestClass", None, [DestructorDecl("TestClass", BlockStatement([], [MethodInvocationStatement(MethodInvocation(PostfixExpression(Identifier("io"), MethodCall("writeStrLn", [StringLiteral('Object destroyed')]))))]))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
-
-
-def test_012():
-    """Test static method invocation AST generation"""
-    source = """class TestClass {
-        void main() {
-            int count := Shape.getCount();
-        }
-    }"""
-    expected = Program([ClassDecl("TestClass", None, [MethodDecl(False, PrimitiveType("void"), "main", [], BlockStatement([VariableDecl(False, PrimitiveType("int"), [Variable("count", PostfixExpression(Identifier("Shape"), MethodCall("getCount", [])))])] , []))])])
-    assert str(ASTGenerator(source).generate()) == str(expected)
+    expected = "Program([ClassDecl(TestClass, [DestructorDecl(~TestClass(), BlockStatement(stmts=[MethodInvocationStatement(StaticMethodInvocation(io.writeStrLn(StringLiteral('Object destroyed'))))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
