@@ -19,7 +19,7 @@ class ASTGeneration(OPLangVisitor):
 
     # classDecl: CLASS ID (EXTENDS ID)? LCURLY memberDecl* RCURLY;
     def visitClassDecl(self, ctx: OPLangParser.ClassDeclContext):
-        name = ctx.ID().getText(0)
+        name = ctx.ID(0).getText()
         super_class = ctx.ID(1).getText() if ctx.EXTENDS() else None
         members = [self.visit(x) for x in ctx.memberDecl()]
         return ClassDecl(name, super_class, members)
@@ -91,7 +91,7 @@ class ASTGeneration(OPLangVisitor):
             ele_type = self.visit(ctx.classType())
             return ArrayType(ele_type, size)
         else :
-            ele_typetype = self.visit(ctx.primitiveNonVoid())
+            ele_type = self.visit(ctx.primitiveNonVoid())
             return ArrayType(ele_type, size)
             
 
@@ -188,10 +188,18 @@ class ASTGeneration(OPLangVisitor):
         right_side = self.visit(ctx.expression())
         return AssignmentStatement(left_side, right_side)
 
-    # lhs: ID | ID LBRACK expression RBRACK | exprDot;
+    # lhs: exprPrimary (LBRACK expression RBRACK)+
+    #| exprIndex (DOT ID (LPAREN argList? RPAREN)?)* DOT ID
+    #| ID ;
     def visitLhs(self, ctx: OPLangParser.LhsContext):
         if ctx.getChildCount() == 3:
-            return LHS(ctx.ID().getText(), self.visit(ctx.expression()))
+            iden = IdLHS(ctx.ID().getText())
+            index = ArrayAccess(ctx.expression())
+            return PostfixLHS(iden, index)
+        elif ctx.ID():
+            return IdLHS(ctx.ID().getText())
+        else :
+            return self.visit(ctx.expreDot())
 
     # if_stmt: IF expression THEN statement (ELSE statement)?;
     def visitIf_stmt(self, ctx: OPLangParser.If_stmtContext): ...
