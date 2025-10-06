@@ -1,13 +1,16 @@
-# 🖥️ BTL2 - AST OPLang
+# HK251_OPLang
 
-| File | Mô tả |
-|------|-------|
-| [Lý thuyết và Bài tập AST](https://github.com/PPL-CS-HCMUT/BTL2-AST-CS) | BẮT BUỘC PHẢI LÀM TRƯỚC |
-| [oplang_specification](oplang_specification.md) | Đặc tả ngôn ngữ OPLang |
----
+## BTL Roadmap
 
-## 🚀 Lệnh chạy
+| BTL   | Task   | Link                                                                 | Status |
+|-------|--------|----------------------------------------------------------------------|--------|
+| BTL1  | Lexer  | [BTL1 Lexer](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL1_Lexer) | ✅ Done |
+| BTL1  | Parser | [BTL1 Parser](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL1_Parser) | ✅ Done |
+| BTL2  | AST    | [BTL2 AST](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL2_AST) | ⏳      |
+| BTL3  | Task1  | [BTL3 Task1](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL3_TASK1) | ⏳      |
+| BTL3  | Task2  | [BTL3 Task2](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL3_TASK2) | ⏳      |
+| BTL4  | Task1  | [BTL4 Task1](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL4_TASK1) | ⏳      |
+| BTL4  | Task2  | [BTL4 Task2](https://github.com/PPL-CS-HCMUT/HK251_OPLang/tree/BTL4_TASK2) | ⏳      |
 
-```bash
 ./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast_gen.py
 ./build.sh && python3 -m pytest -v --timeout=3 tests/test_ast_gen.py::test_001
