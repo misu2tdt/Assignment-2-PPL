@@ -202,31 +202,60 @@ class ASTGeneration(OPLangVisitor):
             return self.visit(ctx.expreDot())
 
     # if_stmt: IF expression THEN statement (ELSE statement)?;
-    def visitIf_stmt(self, ctx: OPLangParser.If_stmtContext): ...
+    def visitIf_stmt(self, ctx: OPLangParser.If_stmtContext): 
+        if_part = self.visit(ctx.expression())
+        then_part = self.visit(ctx.statement(0))
+        else_part = self.visit(ctx.statement(1)) if ctx.statement(1) else None
+        return IfStatement(if_part ,then_part, else_part)
 
-    # for_stmt: FOR ID ASSIGN expression TO expression DO statement;
-    def visitFor_stmt(self, ctx: OPLangParser.For_stmtContext): ...
-
+    # for_stmt: FOR ID ASSIGN expression (TO / DOWNTO) expression DO statement;
+    def visitFor_stmt(self, ctx: OPLangParser.For_stmtContext): 
+        for_var = ctx.ID().getText()
+        start_exp = self.visit(ctx.expression(0))
+        end_exp = self.visit(ctx.expression(1))
+        direction = ctx.getChild(4).getText()
+        do_stmt = self.visit(ctx.statement())
+        return ForStatement(for_var, start_exp, direction, end_exp, do_stmt)
+    
     # break_stmt: BREAK SEMI;
-    def visitBreak_stmt(self, ctx: OPLangParser.Break_stmtContext): ...
+    def visitBreak_stmt(self, ctx: OPLangParser.Break_stmtContext): 
+        return BreakStatement()
 
     # continue_stmt: CONTINUE SEMI;
-    def visitContinue_stmt(self, ctx: OPLangParser.Continue_stmtContext): ...
+    def visitContinue_stmt(self, ctx: OPLangParser.Continue_stmtContext): 
+        return ContinueStatement()
 
     # return_stmt: RETURN expression? SEMI;
-    def visitReturn_stmt(self, ctx: OPLangParser.Return_stmtContext): ...
+    def visitReturn_stmt(self, ctx: OPLangParser.Return_stmtContext): 
+        value = self.visit(ctx.expression()) if ctx.expression() else None
+        return ReturnStatement(value)
 
     # call_stmt: (exprDot | ID) LPAREN argList? RPAREN SEMI;
     def visitCall_stmt(self, ctx: OPLangParser.Call_stmtContext): ...
+        
 
-        # expression: exprOr;
-    def visitExpression(self, ctx: OPLangParser.ExpressionContext): ...
+    # expression: exprOr;
+    def visitExpression(self, ctx: OPLangParser.ExpressionContext): 
+        return self.visit(ctx.exprOr())
 
     # exprOr: exprAnd (OR exprAnd)*;
-    def visitExprOr(self, ctx: OPLangParser.ExprOrContext): ...
+    def visitExprOr(self, ctx: OPLangParser.ExprOrContext): 
+        left_side = self.visit(ctx.exprAnd(0))
+        for i in range (1, len(ctx.exprAnd())):
+            op = ctx.OR(i-1).getText()
+            right_side = self.visit(ctx.exprAnd(i))
+            left_side = BinaryOp(left_side, op, right_side)
+            return left_side
+
 
     # exprAnd: exprEq (AND exprEq)*;
-    def visitExprAnd(self, ctx: OPLangParser.ExprAndContext): ...
+    def visitExprAnd(self, ctx: OPLangParser.ExprAndContext): 
+        left_side = self.visit(exprEq())
+        for i in range (1, len(ctx,exprEq())):
+            op = ctx.AND(i-1).getText()
+            right_side = self.visit(ctx.exprEq(i))
+            left_side = BinaryOp(left_side, op, right_side)
+            return left_side
 
     # exprEq: exprRel ((EQ | NEQ) exprRel)*;
     def visitExprEq(self, ctx: OPLangParser.ExprEqContext): ...
