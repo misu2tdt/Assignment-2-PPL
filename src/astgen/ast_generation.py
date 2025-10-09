@@ -56,9 +56,14 @@ class ASTGeneration(OPLangVisitor):
     def visitAttributeDecl(self, ctx: OPLangParser.AttributeDeclContext): 
         is_static = bool(ctx.STATIC())
         is_final = bool(ctx.FINAL())
-        typee = self.visit(ctx.optype())
-        var_list = self.visit(ctx.var_list())
-        return AttributeDecl(is_static, is_final, typee, var_list)
+        attri_type = self.visit(ctx.optype())
+        attris = []
+        for v in ctx.var_list().var():
+            name = v.ID().getText()
+            init = self.visit(v.expression()) if v.expression() else None
+            attris.append(Attribute(name, init))
+        return AttributeDecl(is_static, is_final, attri_type, attris)
+
 
     # optype: primitiveNonVoid | classType | arrayType;
     def visitOptype(self, ctx: OPLangParser.OptypeContext): 
@@ -116,18 +121,22 @@ class ASTGeneration(OPLangVisitor):
 
 
     # param_list: param (SEMI param)*;
-    def visitParam_list(self, ctx: OPLangParser.Param_listContext): 
-        return [self.visit(x) for x in ctx.param()]
+    def visitParam_list(self, ctx: OPLangParser.Param_listContext):
+        return reduce(lambda a, b: a + b, [self.visit(p) for p in ctx.param()], [])
 
     # param: optype id_list | optype AMP id_list;
     def visitParam(self, ctx: OPLangParser.ParamContext):
         param_type = self.visit(ctx.optype())
-        name = self.visit(ctx.id_list())
-        return Parameter(param_type, name)
+        if ctx.AMP():
+            param_type = ReferenceType(param_type)
+        ids = [x.getText() for x in ctx.id_list().ID()]
+        return [Parameter(param_type, id_name) for id_name in ids]
+
 
     # id_list: ID (COMMA ID)*;
-    def visitId_list(self, ctx: OPLangParser.Id_listContext): 
+    def visitId_list(self, ctx: OPLangParser.Id_listContext):
         return [x.getText() for x in ctx.ID()]
+
 
     # constructorDecl: ID LPAREN param_list? RPAREN block_stmt;
     def visitConstructorDecl(self, ctx: OPLangParser.ConstructorDeclContext): 
@@ -161,19 +170,19 @@ class ASTGeneration(OPLangVisitor):
         else :
             return self.visit(ctx.block_stmt())
 
-    # block_stmt: LCURLY decl_part* stmt_part* RCURLY;
-    def visitBlock_stmt(self, ctx: OPLangParser.Block_stmtContext): 
-        decl_part = [self.visit(x) for x in ctx.decl_part()] if ctx.decl_part else []
-        stmt_part = [self.visit(y) for y in ctx.stmt_part()] if ctx.stmt_part else []
-        return BlockStatement(decl_part, stmt_part)
+    # block_stmt: LCURLY decl_part? stmt_part? RCURLY;
+    def visitBlock_stmt(self, ctx: OPLangParser.Block_stmtContext):
+        decls = self.visit(ctx.decl_part()) if ctx.decl_part() else []
+        stmts = self.visit(ctx.stmt_part()) if ctx.stmt_part() else []
+        return BlockStatement(decls, stmts)
 
-    # decl_part: localdecl;
+    # decl_part: localdecl+;
     def visitDecl_part(self, ctx: OPLangParser.Decl_partContext): 
-        return self.visit(ctx.localdecl())
+        return [self.visit(x) for x in ctx.localdecl()]
 
-    # stmt_part: statement;
+    # stmt_part: statement+;
     def visitStmt_part(self, ctx: OPLangParser.Stmt_partContext): 
-        return self.visit(ctx.statement())
+        return [self.visit(x) for x in ctx.statement()]
 
     # localdecl: FINAL? optype var_list SEMI;
     def visitLocaldecl(self, ctx: OPLangParser.LocaldeclContext): 
@@ -192,14 +201,25 @@ class ASTGeneration(OPLangVisitor):
     #| exprIndex (DOT ID (LPAREN argList? RPAREN)?)* DOT ID
     #| ID ;
     def visitLhs(self, ctx: OPLangParser.LhsContext):
-        if ctx.getChildCount() == 3:
-            iden = IdLHS(ctx.ID().getText())
-            index = ArrayAccess(ctx.expression())
-            return PostfixLHS(iden, index)
-        elif ctx.ID():
-            return IdLHS(ctx.ID().getText())
-        else :
-            return self.visit(ctx.expreDot())
+    # Case 1: chỉ là ID
+        if ctx.ID() and ctx.getChildCount() == 1:
+            return IdLHS(ctx.ID(0).getText())
+
+        # Case 2: array access (arr[0][1])
+        elif ctx.exprPrimary():
+            base = self.visit(ctx.exprPrimary())
+            for exp in ctx.expression():
+                base = PostfixExpression(base, [ArrayAccess(self.visit(exp))])
+            return PostfixLHS(base)
+
+        # Case 3: attribute access (this.x, obj.a.b, ...)
+        elif ctx.exprIndex():
+            base = self.visit(ctx.exprIndex())
+            postfix_ops = [MemberAccess(i.getText()) for i in ctx.ID()]
+            return PostfixLHS(PostfixExpression(base, postfix_ops))
+
+
+
 
     # if_stmt: IF expression THEN statement (ELSE statement)?;
     def visitIf_stmt(self, ctx: OPLangParser.If_stmtContext): 
@@ -231,8 +251,16 @@ class ASTGeneration(OPLangVisitor):
         return ReturnStatement(value)
 
     # call_stmt: (exprDot | ID) LPAREN argList? RPAREN SEMI;
-    def visitCall_stmt(self, ctx: OPLangParser.Call_stmtContext): ...
-        
+    def visitCall_stmt(self, ctx: OPLangParser.Call_stmtContext):
+        if ctx.exprDot():
+            obj = self.visit(ctx.exprDot())
+            method_name = ctx.ID().getText()
+            args = self.visit(ctx.argList()) if ctx.argList() else []
+            return MethodInvocationStatement(PostfixExpression(obj, [MethodCall(method_name, args)]))
+        else:
+            method_name = ctx.ID().getText()
+            args = self.visit(ctx.argList()) if ctx.argList() else []
+            return MethodInvocationStatement(PostfixExpression(Identifier(method_name), [MethodCall("", args)]))
 
     # expression: exprOr;
     def visitExpression(self, ctx: OPLangParser.ExpressionContext): 
@@ -242,53 +270,165 @@ class ASTGeneration(OPLangVisitor):
     def visitExprOr(self, ctx: OPLangParser.ExprOrContext): 
         left_side = self.visit(ctx.exprAnd(0))
         for i in range (1, len(ctx.exprAnd())):
-            op = ctx.OR(i-1).getText()
+            op = ctx.getChild(2 * i - 1).getText()
             right_side = self.visit(ctx.exprAnd(i))
             left_side = BinaryOp(left_side, op, right_side)
-            return left_side
-
+        return left_side
 
     # exprAnd: exprEq (AND exprEq)*;
     def visitExprAnd(self, ctx: OPLangParser.ExprAndContext): 
-        left_side = self.visit(exprEq())
-        for i in range (1, len(ctx,exprEq())):
-            op = ctx.AND(i-1).getText()
+        left_side = self.visit(ctx.exprEq(0))
+        for i in range (1, len(ctx.exprEq())):
+            op = ctx.getChild(2 * i - 1).getText()
             right_side = self.visit(ctx.exprEq(i))
             left_side = BinaryOp(left_side, op, right_side)
+        return left_side
+
+    # exprEq: exprRel ((EQUAL | NOT_EQUAL) exprRel)?;
+    def visitExprEq(self, ctx: OPLangParser.ExprEqContext):
+        left_side = self.visit(ctx.exprRel(0))
+        if ctx.EQUAL():
+            op = ctx.EQUAL().getText()
+            right_side = self.visit(ctx.exprRel(1))
+            return BinaryOp(left_side, op, right_side)
+        elif ctx.NOT_EQUAL():
+            op = ctx.NOT_EQUAL().getText()
+            right_side = self.visit(ctx.exprRel(1))
+            return BinaryOp(left_side, op, right_side)
+        else :
             return left_side
 
-    # exprEq: exprRel ((EQ | NEQ) exprRel)*;
-    def visitExprEq(self, ctx: OPLangParser.ExprEqContext): ...
+    # exprRel: exprAdd ((LT | LE | GT | GE) exprAdd)*;
+    def visitExprRel(self, ctx: OPLangParser.ExprRelContext): 
+        left_side = self.visit(ctx.exprAdd(0))
+        for i in range (1, len(ctx.exprAdd())):
+            if ctx.LT():
+                op = ctx.LT(0).getText()
+            elif ctx.LE():
+                op = ctx.LE(0).getText()
+            elif ctx.GT():
+                op = ctx.GT(0).getText()
+            else :
+                op = ctx.GE(0).getText()
+            right_side = self.visit(ctx.exprAdd(i))
+            left_side = BinaryOp(left_side, op, right_side)
+        return left_side
+        
 
-    # exprRel: exprAdd ((LT | LE | GT | GE) exprAdd)?;
-    def visitExprRel(self, ctx: OPLangParser.ExprRelContext): ...
+    # exprAdd: exprMul ((ADD | SUB | CONCAT) exprMul)*;
+    def visitExprAdd(self, ctx: OPLangParser.ExprAddContext):
+        left_side = self.visit(ctx.exprMul(0))
+        for i in range(1, len(ctx.exprMul())):
+            op = ctx.getChild(2 * i - 1).getText()
+            right_side = self.visit(ctx.exprMul(i))
+            left_side = BinaryOp(left_side, op, right_side)
+        return left_side
 
-    # exprAdd: exprMul ((PLUS | MINUS) exprMul)*;
-    def visitExprAdd(self, ctx: OPLangParser.ExprAddContext): ...
+    # exprMul: exprUnary ((MUL | DIV | INTDIV | MOD) exprUnary)*;
+    def visitExprMul(self, ctx: OPLangParser.ExprMulContext):
+        left_side = self.visit(ctx.exprUnary(0))
+        for i in range(1, len(ctx.exprUnary())):
+            op = ctx.getChild(2 * i - 1).getText()
+            right_side = self.visit(ctx.exprUnary(i))
+            left_side = BinaryOp(left_side, op, right_side)
+        return left_side
+        
 
-    # exprMul: exprUnary ((MUL | DIV | MOD) exprUnary)*;
-    def visitExprMul(self, ctx: OPLangParser.ExprMulContext): ...
+    # exprUnary: NOT exprUnary | ADD exprUnary | SUB exprUnary | exprDot;
+    def visitExprUnary(self, ctx: OPLangParser.ExprUnaryContext): 
+        if ctx.NOT():
+            op = ctx.NOT(0).getText()
+            return UnaryOp(op, self.visit(ctx.exprUnary()))
+        elif ctx.ADD():
+            op = ctx.ADD(0).getText()
+            return UnaryOp(op, self.visit(ctx.exprUnary()))
+        elif ctx.SUB():
+            op = ctx.SUB(0).getText()
+            return UnaryOp(op, self.visit(ctx.exprUnary()))
+        else:
+            return self.visit(ctx.exprDot())
 
-    # exprUnary: (NOT | MINUS) exprUnary | exprDot;
-    def visitExprUnary(self, ctx: OPLangParser.ExprUnaryContext): ...
+    # exprDot: exprIndex ( {self._input.LA(1) == OPLangParser.DOT}? DOT ID (LPAREN argList? RPAREN)? )*;
+    def visitExprDot(self, ctx: OPLangParser.ExprDotContext): 
+        primary = self.visit(ctx.exprIndex())
 
-    # exprDot: exprPrimary (DOT ID (LPAREN argList? RPAREN)?)?;
-    def visitExprDot(self, ctx: OPLangParser.ExprDotContext): ...
+        # Không có dấu '.' → trả nguyên
+        if len(ctx.ID()) == 0:
+            return primary
 
-    # exprIndex: exprPrimary LBRACK expression RBRACK;
-    def visitExprIndex(self, ctx: OPLangParser.ExprIndexContext): ...
+        postfix_ops = []
+        for i in range(len(ctx.ID())):
+            method_name = ctx.ID(i).getText()
+            if ctx.LPAREN(i):
+                args = self.visit(ctx.argList(i)) if ctx.argList(i) else []
+                postfix_ops.append(MethodCall(method_name, args))
+            else:
+                postfix_ops.append(MemberAccess(method_name))
 
-    # exprPrimary: literal | ID | THIS | (LPAREN expression RPAREN);
-    def visitExprPrimary(self, ctx: OPLangParser.ExprPrimaryContext): ...
+        # Nếu primary đã là PostfixExpression → nối thêm
+        if isinstance(primary, PostfixExpression):
+            primary.postfix_ops += postfix_ops
+            return primary
+        else:
+            return PostfixExpression(primary, postfix_ops)
+
+
+
+    # exprIndex: exprPrimary (LBRACK expression RBRACK)*;
+    def visitExprIndex(self, ctx: OPLangParser.ExprIndexContext): 
+        primary = self.visit(ctx.exprPrimary())
+
+        # Nếu không có biểu thức trong [] thì trả về trực tiếp primary
+        if len(ctx.expression()) == 0:
+            return primary
+
+        postfix_ops = [ArrayAccess(self.visit(exp)) for exp in ctx.expression()]
+        return PostfixExpression(primary, postfix_ops)
+
+
+
+    # exprPrimary: NEW ID LPAREN argList? RPAREN | literal | THIS | NIL | ID | LPAREN expression RPAREN | arrayLiteral;
+    def visitExprPrimary(self, ctx: OPLangParser.ExprPrimaryContext): 
+        if ctx.NEW():
+            class_name = ctx.ID().getText()
+            args = self.visit(ctx.argList()) if ctx.argList() else []
+            return ObjectCreation(class_name, args)
+        elif ctx.literal():
+            return self.visit(ctx.literal())
+        elif ctx.THIS():
+            return ThisExpression()
+        elif ctx.NIL():
+            return NilLiteral()
+        elif ctx.ID():
+            return Identifier(ctx.ID().getText())
+        elif ctx.expression():
+            return ParenthesizedExpression(self.visit(ctx.expression()))
+        else:
+            return self.visit(ctx.arrayLiteral())
 
     # argList: expression (COMMA expression)*;
-    def visitArgList(self, ctx: OPLangParser.ArgListContext): ...
+    def visitArgList(self, ctx: OPLangParser.ArgListContext): 
+        return [self.visit(expr) for expr in ctx.expression()]
 
-    # literal: INTLIT | FLOATLIT | STRINGLIT | BOOLEANLIT | arrayLiteral;
-    def visitLiteral(self, ctx: OPLangParser.LiteralContext): ...
+    # literal: INTLIT | FLOATLIT | STRINGLIT | TRUE | FALSE | NIL;
+    def visitLiteral(self, ctx: OPLangParser.LiteralContext): 
+        if ctx.INTLIT():
+            return IntLiteral(int(ctx.INTLIT().getText()))
+        elif ctx.FLOATLIT():
+            return FloatLiteral(float(ctx.FLOATLIT().getText()))
+        elif ctx.STRINGLIT():
+            return StringLiteral(ctx.STRINGLIT().getText())
+        elif ctx.TRUE():
+            return BoolLiteral(True)
+        elif ctx.FALSE():
+            return BoolLiteral(False)
+        else:
+            return NilLiteral()
 
-    # arrayLiteral: LBRACK (literal (COMMA literal)*)? RBRACK;
-    def visitArrayLiteral(self, ctx: OPLangParser.ArrayLiteralContext): ...
+    # arrayLiteral: LCURLY literal (COMMA literal)* RCURLY;
+    def visitArrayLiteral(self, ctx: OPLangParser.ArrayLiteralContext): 
+        elements = [self.visit(lit) for lit in ctx.literal()]
+        return ArrayLiteral(elements)
 
 
     
