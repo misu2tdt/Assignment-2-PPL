@@ -53,17 +53,19 @@ class ASTGeneration(OPLangVisitor):
             return MethodDecl(is_static, ret_type, name, param, body)
 
     # attributeDecl: (STATIC | FINAL | STATIC FINAL | FINAL STATIC)? optype var_list SEMI;
-    def visitAttributeDecl(self, ctx: OPLangParser.AttributeDeclContext): 
+    def visitAttributeDecl(self, ctx: OPLangParser.AttributeDeclContext):
         is_static = bool(ctx.STATIC())
         is_final = bool(ctx.FINAL())
-        attri_type = self.visit(ctx.optype())
+        base_type = self.visit(ctx.optype())
+        has_ref = any(v.AMP() for v in ctx.var_list().var())
+        attri_type = ReferenceType(base_type) if has_ref else base_type
         attris = []
         for v in ctx.var_list().var():
             name = v.ID().getText()
             init = self.visit(v.expression()) if v.expression() else None
             attris.append(Attribute(name, init))
-        return AttributeDecl(is_static, is_final, attri_type, attris)
 
+        return AttributeDecl(is_static, is_final, attri_type, attris)
 
     # optype: primitiveNonVoid | classType | arrayType;
     def visitOptype(self, ctx: OPLangParser.OptypeContext): 
@@ -197,29 +199,61 @@ class ASTGeneration(OPLangVisitor):
         right_side = self.visit(ctx.expression())
         return AssignmentStatement(left_side, right_side)
 
-    # lhs: exprPrimary (LBRACK expression RBRACK)+
-    #| exprIndex (DOT ID (LPAREN argList? RPAREN)?)* DOT ID
-    #| ID ;
+    # llhs
+    #: exprPrimary (LBRACK expression RBRACK)+
+    #| exprPrimary (LBRACK expression RBRACK)* (DOT ID (LPAREN argList? RPAREN)? )* DOT ID
+    #| ID;
     def visitLhs(self, ctx: OPLangParser.LhsContext):
-    # Case 1: chỉ là ID
         if ctx.ID() and ctx.getChildCount() == 1:
             return IdLHS(ctx.ID(0).getText())
+        base = self.visit(ctx.exprPrimary())
+        bracket_ops = []
+        for exp in ctx.expression():  
+            bracket_ops.append(ArrayAccess(self.visit(exp)))
 
-        # Case 2: array access (arr[0][1])
-        elif ctx.exprPrimary():
-            base = self.visit(ctx.exprPrimary())
-            for exp in ctx.expression():
-                base = PostfixExpression(base, [ArrayAccess(self.visit(exp))])
-            return PostfixLHS(base)
+        node = PostfixExpression(base, bracket_ops) if bracket_ops else base
+        i = 0
+        consumed = 1  
+        while consumed < ctx.getChildCount():
+            if ctx.getChild(consumed).getText() == '[':
+                consumed += 3
+            else:
+                break
+        ops = []
+        i = consumed
+        n = ctx.getChildCount()
+        while i < n:
+            if ctx.getChild(i).getText() != '.':
+                i += 1
+                continue
 
-        # Case 3: attribute access (this.x, obj.a.b, ...)
-        elif ctx.exprIndex():
-            base = self.visit(ctx.exprIndex())
-            postfix_ops = [MemberAccess(i.getText()) for i in ctx.ID()]
-            return PostfixLHS(PostfixExpression(base, postfix_ops))
+            name = ctx.getChild(i + 1).getText()
+            j = i + 2
+            if j < n and ctx.getChild(j).getText() == '(':
+                args = []
+                if (j + 1) < n and isinstance(ctx.getChild(j + 1), OPLangParser.ArgListContext):
+                    args = self.visit(ctx.getChild(j + 1))
+                    j += 1
+                ops.append(MethodCall(name, args))
+                i = j + 2  
+            else:
+                ops.append(MemberAccess(name))
+                i += 2
 
+        if ops:
+            # gộp với phần [] trước đó nếu có
+            if isinstance(node, PostfixExpression):
+                node = PostfixExpression(node.base, node.postfix_ops + ops)
+            else:
+                node = PostfixExpression(node, ops)
 
+        # LHS là postfix hoặc id
+        if isinstance(node, PostfixExpression):
+            return PostfixLHS(node)
+        if isinstance(node, Identifier):
+            return IdLHS(node.name if hasattr(node, "name") else ctx.ID(0).getText())
 
+        return PostfixLHS(node)
 
     # if_stmt: IF expression THEN statement (ELSE statement)?;
     def visitIf_stmt(self, ctx: OPLangParser.If_stmtContext): 
@@ -337,54 +371,55 @@ class ASTGeneration(OPLangVisitor):
     # exprUnary: NOT exprUnary | ADD exprUnary | SUB exprUnary | exprDot;
     def visitExprUnary(self, ctx: OPLangParser.ExprUnaryContext): 
         if ctx.NOT():
-            op = ctx.NOT(0).getText()
+            op = ctx.NOT().getText()
             return UnaryOp(op, self.visit(ctx.exprUnary()))
         elif ctx.ADD():
-            op = ctx.ADD(0).getText()
+            op = ctx.ADD().getText()
             return UnaryOp(op, self.visit(ctx.exprUnary()))
         elif ctx.SUB():
-            op = ctx.SUB(0).getText()
+            op = ctx.SUB().getText()
             return UnaryOp(op, self.visit(ctx.exprUnary()))
         else:
             return self.visit(ctx.exprDot())
 
     # exprDot: exprIndex ( {self._input.LA(1) == OPLangParser.DOT}? DOT ID (LPAREN argList? RPAREN)? )*;
     def visitExprDot(self, ctx: OPLangParser.ExprDotContext): 
-        primary = self.visit(ctx.exprIndex())
-
-        # Không có dấu '.' → trả nguyên
-        if len(ctx.ID()) == 0:
-            return primary
-
+        base = self.visit(ctx.exprPrimary())
         postfix_ops = []
-        for i in range(len(ctx.ID())):
-            method_name = ctx.ID(i).getText()
-            if ctx.LPAREN(i):
-                args = self.visit(ctx.argList(i)) if ctx.argList(i) else []
-                postfix_ops.append(MethodCall(method_name, args))
+
+        i = 1
+        n = ctx.getChildCount()
+        while i < n:
+            tok = ctx.getChild(i).getText()
+
+            if tok == '.':
+                name = ctx.getChild(i + 1).getText()
+                # .ID(...)
+                if (i + 2) < n and ctx.getChild(i + 2).getText() == '(':
+                    args = []
+                    if (i + 3) < n and isinstance(ctx.getChild(i + 3), OPLangParser.ArgListContext):
+                        args = self.visit(ctx.getChild(i + 3))
+                        i += 1  # skip argList
+                    postfix_ops.append(MethodCall(name, args))
+                    i += 4  # skip ". ID ( ... )"
+                else:
+                    # .ID
+                    postfix_ops.append(MemberAccess(name))
+                    i += 2
+
+            elif tok == '[':
+                # [ expression ]
+                exp_ctx = ctx.getChild(i + 1)
+                postfix_ops.append(ArrayAccess(self.visit(exp_ctx)))
+                i += 3
             else:
-                postfix_ops.append(MemberAccess(method_name))
+                i += 1
 
-        # Nếu primary đã là PostfixExpression → nối thêm
-        if isinstance(primary, PostfixExpression):
-            primary.postfix_ops += postfix_ops
-            return primary
-        else:
-            return PostfixExpression(primary, postfix_ops)
-
-
-
-    # exprIndex: exprPrimary (LBRACK expression RBRACK)*;
-    def visitExprIndex(self, ctx: OPLangParser.ExprIndexContext): 
-        primary = self.visit(ctx.exprPrimary())
-
-        # Nếu không có biểu thức trong [] thì trả về trực tiếp primary
-        if len(ctx.expression()) == 0:
-            return primary
-
-        postfix_ops = [ArrayAccess(self.visit(exp)) for exp in ctx.expression()]
-        return PostfixExpression(primary, postfix_ops)
-
+        if not postfix_ops:
+            return base
+        if isinstance(base, PostfixExpression):
+            return PostfixExpression(base.base, base.postfix_ops + postfix_ops)
+        return PostfixExpression(base, postfix_ops)
 
 
     # exprPrimary: NEW ID LPAREN argList? RPAREN | literal | THIS | NIL | ID | LPAREN expression RPAREN | arrayLiteral;
@@ -429,6 +464,7 @@ class ASTGeneration(OPLangVisitor):
     def visitArrayLiteral(self, ctx: OPLangParser.ArrayLiteralContext): 
         elements = [self.visit(lit) for lit in ctx.literal()]
         return ArrayLiteral(elements)
+
 
 
     

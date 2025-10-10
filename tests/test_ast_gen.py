@@ -128,34 +128,113 @@ def test_011():
     expected = "Program([ClassDecl(TestClass, [DestructorDecl(~TestClass(), BlockStatement(vars=[VariableDecl(PrimitiveType(int), [Variable(x = IntLiteral(0))])], stmts=[]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
-def test_092():
-    source = """class B {
-        void B(){
-            io.writeStrLn().d.c();
-            return io.readInt(1).d.c();
+def test_015():
+    source = """
+        class V {
+            final int a;
+            static float b;
+            final static boolean c;
+            static final string d;
+            int[002] e;
+            boolean & g;
+            ID[3] &h;
         }
-    }"""
-    expected = Program([
-        ClassDecl("B", None, [
-            MethodDecl(
-                False,
-                PrimitiveType("void"),
-                "B",
-                [],
-                BlockStatement([], [
-                    MethodInvocationStatement(
-                        PostfixExpression(
-                            Identifier("io"),
-                            [MethodCall("writeStrLn", []), MemberAccess("d"), MethodCall("c", [])]
-                        )
-                    ),
-                    ReturnStatement(PostfixExpression(
-                        Identifier("io"),
-                        [MethodCall("readInt", [IntLiteral(1)]), MemberAccess("d"), MethodCall("c", [])]
-                    ))
-                ])
-            )
-        ])
-    ])
+        """
+    expected = Program([ClassDecl("V", None, [
+                    AttributeDecl(False, True, PrimitiveType("int"), [Attribute("a", None)]),
+                    AttributeDecl(True, False, PrimitiveType("float"), [Attribute("b", None)]),
+                    AttributeDecl(True, True, PrimitiveType("boolean"), [Attribute("c", None)]),
+                    AttributeDecl(True, True, PrimitiveType("string"), [Attribute("d", None)]),
+                    AttributeDecl(False, False, ArrayType(PrimitiveType("int"), 2), [Attribute("e", None)]),
+                    AttributeDecl(False, False, ReferenceType(PrimitiveType("boolean")), [Attribute("g", None)]),
+                    AttributeDecl(False, False, ReferenceType(ArrayType(ClassType("ID"), (3))), [Attribute("h", None)])
+                ])])
     assert str(ASTGenerator(source).generate()) == str(expected)
 
+def test_016():
+    source = """
+        class V {
+            final int& a, b := 2, c;
+            static int[2] a, b, c;
+            ID[3] a := "s", b := 1.2, c := 2, d := true, e := false, f := nil;
+        }
+        """
+    expected =  Program([ClassDecl("V", None, [
+                    AttributeDecl(False, True, ReferenceType(PrimitiveType("int")), [Attribute("a", None), Attribute("b", IntLiteral(2)), Attribute("c", None)]),
+                    AttributeDecl(True, False, ArrayType(PrimitiveType("int"), 2), [Attribute("a", None), Attribute("b", None), Attribute("c", None)]),
+                    AttributeDecl(False, False, ArrayType(ClassType("ID"), (3)), [Attribute("a", StringLiteral('s')), Attribute("b", FloatLiteral(1.2)), Attribute("c", IntLiteral(2)), Attribute("d", BoolLiteral(True)), Attribute("e", BoolLiteral(False)), Attribute("f", NilLiteral())]),
+                ])])
+    assert str(ASTGenerator(source).generate()) == str(expected)
+
+def test_019():
+    source = """
+    class V {
+        int a := a.b.c + this.a.b;
+        int b := a.b.c() + this.a();
+        int c := a.b().c.d(1, 2)[3];
+    }
+    """
+    expected = Program([
+            ClassDecl("V", None, [
+                AttributeDecl(
+                    False, False, PrimitiveType("int"), [
+                        Attribute(
+                            "a",
+                            BinaryOp(
+                                PostfixExpression(
+                                    Identifier("a"),
+                                    [MemberAccess("b"), MemberAccess("c")]
+                                ),
+                                "+",
+                                PostfixExpression(
+                                    ThisExpression(),
+                                    [MemberAccess("a"), MemberAccess("b")]
+                                )
+                            )
+                        )
+                    ]
+                ),
+                AttributeDecl(
+                    False, False, PrimitiveType("int"), [
+                        Attribute(
+                            "b",
+                            BinaryOp(
+                                PostfixExpression(
+                                    Identifier("a"),
+                                    [MemberAccess("b"), MethodCall("c", [])]
+                                ),
+                                "+",
+                                PostfixExpression(
+                                    ThisExpression(),
+                                    [MethodCall("a", [])]
+                                )
+                            )
+                        )
+                    ]
+                ),
+                AttributeDecl(
+                    False, False, PrimitiveType("int"), [
+                        Attribute(
+                            "c",
+                            PostfixExpression(
+                                Identifier("a"),
+                                [MethodCall("b", []), MemberAccess("c"), MethodCall("d", [IntLiteral(1), IntLiteral(2)]), ArrayAccess(IntLiteral(3))]
+                            )
+                        )
+                    ]
+                )
+            ])
+        ])
+    assert str(ASTGenerator(source).generate()) == str(expected)
+
+def test_021():
+    source = """
+    class V {
+        int a := -1 + +1;
+        int c := -+-a[2];
+    }
+    """
+    expected = Program([ClassDecl("V", None, [
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(UnaryOp("-", IntLiteral(1)), "+", UnaryOp("+", IntLiteral(1))))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("c", UnaryOp("-", UnaryOp("+", UnaryOp("-", PostfixExpression(Identifier("a"), [ArrayAccess(IntLiteral(2))])))))])])])
+    assert str(ASTGenerator(source).generate()) == str(expected)

@@ -49,10 +49,11 @@ stmt_part: statement+;
 localdecl: FINAL? optype var_list SEMI;
 assign_stmt: lhs ASSIGN expression SEMI;
 
-lhs: exprPrimary (LBRACK expression RBRACK)+
-   | exprIndex (DOT ID (LPAREN argList? RPAREN)?)* DOT ID
-   | ID
-   ;
+lhs
+    : exprPrimary (LBRACK expression RBRACK)+
+    | exprPrimary (LBRACK expression RBRACK)* (DOT ID (LPAREN argList? RPAREN)? )* DOT ID
+    | ID
+    ;
 
 if_stmt: IF expression THEN statement (ELSE statement)?;
 for_stmt: FOR ID ASSIGN expression (TO | DOWNTO) expression DO statement;
@@ -69,8 +70,7 @@ exprRel: exprAdd ((LT | GT | LE | GE) exprAdd)*;
 exprAdd: exprMul ((ADD | SUB | CONCAT) exprMul)*;
 exprMul: exprUnary ((MUL | DIV | INTDIV | MOD) exprUnary)*;
 exprUnary: NOT exprUnary | ADD exprUnary | SUB exprUnary | exprDot;
-exprDot: exprIndex ( {self._input.LA(1) == OPLangParser.DOT}? DOT ID (LPAREN argList? RPAREN)? )*;
-exprIndex: exprPrimary (LBRACK expression RBRACK)*;
+exprDot: exprPrimary (DOT ID (LPAREN argList? RPAREN)? | LBRACK expression RBRACK)*;
 exprPrimary: NEW ID LPAREN argList? RPAREN | literal | THIS | NIL | ID | LPAREN expression RPAREN | arrayLiteral;
 
 argList: expression (COMMA expression)*;
