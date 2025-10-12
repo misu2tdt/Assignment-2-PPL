@@ -241,7 +241,6 @@ class ASTGeneration(OPLangVisitor):
                 i += 2
 
         if ops:
-            # gộp với phần [] trước đó nếu có
             if isinstance(node, PostfixExpression):
                 node = PostfixExpression(node.base, node.postfix_ops + ops)
             else:
@@ -301,68 +300,86 @@ class ASTGeneration(OPLangVisitor):
         return self.visit(ctx.exprOr())
 
     # exprOr: exprAnd (OR exprAnd)*;
-    def visitExprOr(self, ctx: OPLangParser.ExprOrContext): 
-        left_side = self.visit(ctx.exprAnd(0))
-        for i in range (1, len(ctx.exprAnd())):
+    def visitExprOr(self, ctx: OPLangParser.ExprOrContext):
+        left = self.visit(ctx.exprAnd(0))
+        for i in range(1, len(ctx.exprAnd())):
             op = ctx.getChild(2 * i - 1).getText()
-            right_side = self.visit(ctx.exprAnd(i))
-            left_side = BinaryOp(left_side, op, right_side)
-        return left_side
-
-    # exprAnd: exprEq (AND exprEq)*;
-    def visitExprAnd(self, ctx: OPLangParser.ExprAndContext): 
-        left_side = self.visit(ctx.exprEq(0))
-        for i in range (1, len(ctx.exprEq())):
+            right = self.visit(ctx.exprAnd(i))
+            left = BinaryOp(left, op, right)
+        return left
+    
+    def visitExprAnd(self, ctx: OPLangParser.ExprAndContext):
+        # Lấy exprRel đầu tiên
+        left = self.visit(ctx.exprRel(0))
+        for i in range(1, len(ctx.exprRel())):
             op = ctx.getChild(2 * i - 1).getText()
-            right_side = self.visit(ctx.exprEq(i))
-            left_side = BinaryOp(left_side, op, right_side)
-        return left_side
+            right = self.visit(ctx.exprRel(i))
+            if isinstance(left, BinaryOp) and left.op in ["==", "!="]:
+                left.right = BinaryOp(left.right, op, right)
+            else:
+                left = BinaryOp(left, op, right)
+        return left
 
-    # exprEq: exprRel ((EQUAL | NOT_EQUAL) exprRel)?;
+    # exprRel: exprEq ((LT | GT | LE | GE) exprEq)* ;
+    def visitExprRel(self, ctx: OPLangParser.ExprRelContext):
+        left = self.visit(ctx.exprEq(0))
+        for i in range(1, len(ctx.exprEq())):
+            op = ctx.getChild(2 * i - 1).getText()
+            right = self.visit(ctx.exprEq(i))
+            left = BinaryOp(left, op, right)
+        return left
+
+    # exprEq: exprAdd ((EQUAL | NOT_EQUAL) exprAdd)? ;
     def visitExprEq(self, ctx: OPLangParser.ExprEqContext):
-        left_side = self.visit(ctx.exprRel(0))
+        left = self.visit(ctx.exprAdd(0))
         if ctx.EQUAL():
             op = ctx.EQUAL().getText()
-            right_side = self.visit(ctx.exprRel(1))
-            return BinaryOp(left_side, op, right_side)
+            right = self.visit(ctx.exprAdd(1))
+            return BinaryOp(left, op, right)
         elif ctx.NOT_EQUAL():
             op = ctx.NOT_EQUAL().getText()
-            right_side = self.visit(ctx.exprRel(1))
-            return BinaryOp(left_side, op, right_side)
-        else :
-            return left_side
+            right = self.visit(ctx.exprAdd(1))
+            return BinaryOp(left, op, right)
+        return left
 
-    # exprRel: exprAdd ((LT | LE | GT | GE) exprAdd)*;
-    def visitExprRel(self, ctx: OPLangParser.ExprRelContext): 
-        left_side = self.visit(ctx.exprAdd(0))
-        for i in range (1, len(ctx.exprAdd())):
-            if ctx.LT():
-                op = ctx.LT(0).getText()
-            elif ctx.LE():
-                op = ctx.LE(0).getText()
-            elif ctx.GT():
-                op = ctx.GT(0).getText()
-            else :
-                op = ctx.GE(0).getText()
-            right_side = self.visit(ctx.exprAdd(i))
-            left_side = BinaryOp(left_side, op, right_side)
-        return left_side
+    # exprEq: exprAdd ((EQUAL | NOT_EQUAL) exprAdd)? ;
+    def visitExprEq(self, ctx: OPLangParser.ExprEqContext):
+        left = self.visit(ctx.exprAdd(0))
+        if ctx.EQUAL():
+            op = ctx.EQUAL().getText()
+            right = self.visit(ctx.exprAdd(1))
+            return BinaryOp(left, op, right)
+        elif ctx.NOT_EQUAL():
+            op = ctx.NOT_EQUAL().getText()
+            right = self.visit(ctx.exprAdd(1))
+            return BinaryOp(left, op, right)
+        return left
+
         
 
-    # exprAdd: exprMul ((ADD | SUB | CONCAT) exprMul)*;
+    # exprAdd: exprMul ((ADD | SUB) exprMul)*;
     def visitExprAdd(self, ctx: OPLangParser.ExprAddContext):
         left_side = self.visit(ctx.exprMul(0))
         for i in range(1, len(ctx.exprMul())):
-            op = ctx.getChild(2 * i - 1).getText()
+            op = ctx.getChild(2 * i - 1).getText()   # + hoặc -
             right_side = self.visit(ctx.exprMul(i))
             left_side = BinaryOp(left_side, op, right_side)
         return left_side
 
-    # exprMul: exprUnary ((MUL | DIV | INTDIV | MOD) exprUnary)*;
+    # exprMul: exprCat ((MUL | DIV | INTDIV | MOD) exprCat)*;
     def visitExprMul(self, ctx: OPLangParser.ExprMulContext):
+        left_side = self.visit(ctx.exprCat(0))
+        for i in range(1, len(ctx.exprCat())):
+            op = ctx.getChild(2 * i - 1).getText()  
+            right_side = self.visit(ctx.exprCat(i))
+            left_side = BinaryOp(left_side, op, right_side)
+        return left_side
+    
+    #  exprCat: exprUnary (CONCAT exprUnary)*;
+    def visitExprCat(self, ctx: OPLangParser.ExprCatContext):
         left_side = self.visit(ctx.exprUnary(0))
         for i in range(1, len(ctx.exprUnary())):
-            op = ctx.getChild(2 * i - 1).getText()
+            op = ctx.getChild(2 * i - 1).getText() 
             right_side = self.visit(ctx.exprUnary(i))
             left_side = BinaryOp(left_side, op, right_side)
         return left_side
@@ -394,14 +411,13 @@ class ASTGeneration(OPLangVisitor):
 
             if tok == '.':
                 name = ctx.getChild(i + 1).getText()
-                # .ID(...)
                 if (i + 2) < n and ctx.getChild(i + 2).getText() == '(':
                     args = []
                     if (i + 3) < n and isinstance(ctx.getChild(i + 3), OPLangParser.ArgListContext):
                         args = self.visit(ctx.getChild(i + 3))
                         i += 1  # skip argList
                     postfix_ops.append(MethodCall(name, args))
-                    i += 4  # skip ". ID ( ... )"
+                    i += 4  
                 else:
                     # .ID
                     postfix_ops.append(MemberAccess(name))

@@ -238,3 +238,47 @@ def test_021():
             AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(UnaryOp("-", IntLiteral(1)), "+", UnaryOp("+", IntLiteral(1))))]),
             AttributeDecl(False, False, PrimitiveType("int"), [Attribute("c", UnaryOp("-", UnaryOp("+", UnaryOp("-", PostfixExpression(Identifier("a"), [ArrayAccess(IntLiteral(2))])))))])])])
     assert str(ASTGenerator(source).generate()) == str(expected)
+
+def test_024():
+    source = """
+    class V {
+        int a := 1 * 2 / 3 \\ 4 % 5;
+        int b := 1 * 2 ^ 3;
+    }
+    """
+    expected = Program([ClassDecl("V", None, [
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(BinaryOp(BinaryOp(BinaryOp(IntLiteral(1), "*", IntLiteral(2)), "/", IntLiteral(3)), "\\", IntLiteral(4)), "%", IntLiteral(5)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("b", BinaryOp(IntLiteral(1), "*", BinaryOp(IntLiteral(2), "^", IntLiteral(3))))])])])
+    assert str(ASTGenerator(source).generate()) == str(expected)
+
+def test_027():
+    source = """
+    class V {
+        int a := 1 != 2;
+        int a := 1 == 2;
+        int b := 1 == 2 && 3;
+    }
+    """
+    expected = Program([ClassDecl("V", None, [
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), "!=", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), "==", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("b", BinaryOp(IntLiteral(1), "==", BinaryOp(IntLiteral(2), "&&", IntLiteral(3))))])])])
+    assert str(ASTGenerator(source).generate()) == str(expected)
+
+def test_028():
+    source = """
+    class V {
+        int a := 1 > 2;
+        int a := 1 < 2;
+        int a := 1 <= 2;
+        int a := 1 >= 2;
+        int b := 1 > 2 == 3;
+    }
+    """
+    expected = Program([ClassDecl("V", None, [
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), ">", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), "<", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), "<=", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("a", BinaryOp(IntLiteral(1), ">=", IntLiteral(2)))]),
+            AttributeDecl(False, False, PrimitiveType("int"), [Attribute("b", BinaryOp(IntLiteral(1), ">", BinaryOp(IntLiteral(2), "==", IntLiteral(3))))])])])
+    assert str(ASTGenerator(source).generate()) == str(expected)
